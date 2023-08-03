@@ -2,11 +2,13 @@ import argparse
 import os
 
 import json
+import signal
 import peft
 import wandb
 import torch
 import random
 import time
+from multiprocessing import Pool
 from datasets.load import load_dataset
 from torch.utils.data import IterableDataset
 from number_of_tokens import get_total_tokens
@@ -212,6 +214,7 @@ class ConstantLengthDataset(IterableDataset):
         self.fim_rate = fim_rate
         self.fim_spm_rate = fim_spm_rate
         self.seed = 0
+        self.pool = Pool(8)
 
         (
             self.suffix_tok_id,
@@ -249,21 +252,46 @@ class ConstantLengthDataset(IterableDataset):
             all_token_ids = []
             examples = []
             np_rng = np.random.RandomState(seed=self.seed)
-            for tokenized_input in tokenized_inputs:
-                # optionally do FIM permutations
-                if self.fim_rate > 0:
-                    tokenized_input, np_rng = fim.permute(
-                        self.tokenizer,
-                        tokenized_input,
-                        np_rng,
-                        self.suffix_tok_id,
-                        self.prefix_tok_id,
-                        self.middle_tok_id,
-                        fim_rate=self.fim_rate,
-                        fim_spm_rate=self.fim_spm_rate,
-                    )
+            processed_tokenized_inputs = self.pool.imap(
+                fim.permute_pool_program,
+                zip(
+                    [self.tokenizer] * len(tokenized_inputs),
+                    tokenized_inputs,
+                    [np_rng] * len(tokenized_inputs),
+                    [self.suffix_tok_id] * len(tokenized_inputs),
+                    [self.prefix_tok_id] * len(tokenized_inputs),
+                    [self.middle_tok_id] * len(tokenized_inputs),
+                    [self.fim_rate] * len(tokenized_inputs),
+                    [self.fim_spm_rate] * len(tokenized_inputs),
+                ),
+            )
+
+            tokenized_inputs = []
+            while True:
+                try:
+                    def timeout_handler(_, __):
+                        raise KeyboardInterrupt  # it's fineeeeeee
+
+                    signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(60)
+                    tokenized_inputs.append(next(processed_tokenized_inputs))
+                    signal.alarm(0)
+                except KeyboardInterrupt:
+                    signal.alarm(0)
+                    print("Keyboard interrupt. Terminating pool")
+                    self.pool.terminate()
+                    self.pool = Pool(8)
+                    break
+                except StopIteration:
+                    break
+
+            signal.alarm(0)
+
+            for tokenized_input in processed_tokenized_inputs:
                 if not tokenized_input is None:
-                    all_token_ids.extend(tokenized_input + [self.concat_token_id])
+                    all_token_ids.extend(
+                        tokenized_input + [self.concat_token_id])
+
             for i in range(0, len(all_token_ids), self.seq_length):
                 input_ids = all_token_ids[i: i + self.seq_length]
                 if len(input_ids) == self.seq_length:

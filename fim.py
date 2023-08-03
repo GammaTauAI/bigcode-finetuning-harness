@@ -1,14 +1,11 @@
 from pathlib import Path
-import signal
 from tree_sitter import Language, Parser, Node
 import functools
-import random
-import hashlib
 
 import numpy as np
 from numpy.random import RandomState
 
-from typing import List, Tuple, Any, Optional
+from typing import List, Tuple, Optional
 
 Language.build_library(
     f"{Path(__file__).parent}/build/languages.so",
@@ -18,8 +15,6 @@ TS_LANGUAGE = Language(
     f"{Path(__file__).parent}/build/languages.so", 'typescript')
 PARSER = Parser()
 PARSER.set_language(TS_LANGUAGE)
-
-# this is expensive so we cache it
 
 
 @functools.lru_cache(maxsize=None)
@@ -38,6 +33,30 @@ def get_fim_token_ids(tokenizer):
     except KeyError:
         suffix_tok_id, prefix_tok_id, middle_tok_id, pad_tok_id = None, None, None, None
     return suffix_tok_id, prefix_tok_id, middle_tok_id, pad_tok_id
+
+
+def permute_pool_program(tpl):
+    tokenizer = tpl[0]
+    tokenized_input = tpl[1]
+    np_rng = tpl[2]
+    suffix_tok_id = tpl[3]
+    prefix_tok_id = tpl[4]
+    middle_tok_id = tpl[5]
+    fim_rate = tpl[6]
+    fim_spm_rate = tpl[7]
+    if fim_rate == 0:
+        return tokenized_input
+    toks, _ = permute(
+        tokenizer,
+        tokenized_input,
+        np_rng,
+        suffix_tok_id,
+        prefix_tok_id,
+        middle_tok_id,
+        fim_rate=fim_rate,
+        fim_spm_rate=fim_spm_rate,
+    )
+    return toks
 
 
 def get_prefix_middle_suffix(np_rng: RandomState, sample: bytes, strip_suffix_rate: float) -> Optional[Tuple[Tuple[str, str, str], RandomState]]:
@@ -141,19 +160,8 @@ def permute(
             decoded_bytes = decoded_bytes.encode("utf-8")
 
         try:
-            def timeout_handler(_, __):
-                decoded = decoded_bytes.decode("utf-8")
-                h = hashlib.sha1(
-                    f"blob {len(decoded.encode())}\0{decoded}".encode()).hexdigest()
-                raise Exception(f"Timeout after 10 seconds: {h}")
-
-            # set a timeout of 10 seconds, using signal.alarm
-            signal.signal(signal.SIGALRM, timeout_handler)
-
-            signal.alarm(10)
             res = get_prefix_middle_suffix(
                 np_rng, decoded_bytes, strip_suffix_rate)
-            signal.alarm(0)
 
         except Exception as e:
             print(e)
