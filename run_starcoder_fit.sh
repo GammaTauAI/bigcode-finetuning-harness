@@ -11,6 +11,7 @@ python3 -m torch.distributed.launch \
         --model_path="bigcode/starcoderbase" \
         --no_custom_tokenizer \
         --dataset_name="nuprl/ts-training" \
+        --total_tokens 10063051440 \
         --fim_rate 1 \
         --fim_spm_rate 0.5 \
         --output_dir="./model_starcoder_15b_fit_8k" \
