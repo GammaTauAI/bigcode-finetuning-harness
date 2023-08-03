@@ -18,8 +18,8 @@ python3 -m torch.distributed.launch \
         --output_dir="./model_starcoder_1b_fit_8k" \
         --seq_length 8192 \
         --epochs 10 \
-        --batch_size 4 \
-        --gradient_accumulation_steps 4 \
+        --batch_size 2 \
+        --gradient_accumulation_steps 8 \
         --learning_rate 2e-5 \
         --num_warmup_steps 10 \
         --num_workers=$(expr $(nproc --all) - 4) \
