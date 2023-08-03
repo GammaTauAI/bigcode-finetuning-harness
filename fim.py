@@ -161,11 +161,9 @@ def permute(
             return None, np_rng
 
         if res is None:
-            print("No type annotations found in sample")
             return None, np_rng
 
         (prefix_str, middle_str, suffix_str), np_rng = res
-        print(f"Was able to split on type: \"{middle_str}\"")
 
         prefix = np.array(tokenizer.encode(prefix_str))
         middle = np.array(tokenizer.encode(middle_str))
