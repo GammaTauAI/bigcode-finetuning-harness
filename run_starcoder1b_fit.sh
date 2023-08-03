@@ -12,6 +12,7 @@ python3 -m torch.distributed.launch \
         --no_custom_tokenizer \
         --dataset_name="nuprl/ts-training" \
         --dataset_revision="v1.1p1" \
+        --total_tokens=7203565775 \
         --fim_rate 1 \
         --fim_spm_rate 0.5 \
         --output_dir="./model_starcoder_1b_fit_8k" \
