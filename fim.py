@@ -25,9 +25,13 @@ PARSER.set_language(TS_LANGUAGE)
 @functools.lru_cache(maxsize=None)
 def get_fim_token_ids(tokenizer):
     try:
-        _, FIM_PREFIX, FIM_MIDDLE, FIM_SUFFIX, FIM_PAD = tokenizer.special_tokens_map[
-            "additional_special_tokens"
-        ]
+        FIM_SUFFIX, FIM_PREFIX, FIM_MIDDLE, FIM_PAD = (
+            f"<fim_suffix>",
+            f"<fim_prefix>",
+            f"<fim_middle>",
+            f"<fim_pad>",
+        )
+
         suffix_tok_id, prefix_tok_id, middle_tok_id, pad_tok_id = (
             tokenizer.vocab[tok] for tok in [FIM_SUFFIX, FIM_PREFIX, FIM_MIDDLE, FIM_PAD]
         )
