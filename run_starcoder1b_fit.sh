@@ -24,8 +24,8 @@ python3 -m torch.distributed.launch \
         --num_warmup_steps 10 \
         --num_workers=$(expr $(nproc --all) - 4) \
         --no_fp16 \
-        --eval_freq 0.1 \
-        --save_freq 0.1 \
+        --eval_freq 0.01 \
+        --save_freq 0.01 \
         --bf16 \
-        --perc_valid_set 0.001 \
-        --save_total_limit 20
+        --perc_valid_set 0.0001 \
+        --save_total_limit 40
