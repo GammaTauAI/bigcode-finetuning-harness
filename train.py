@@ -26,6 +26,7 @@ from transformers import (
     set_seed,
 )
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
+import fim
 
 
 class SavePeftModelCallback(TrainerCallback):
@@ -102,6 +103,9 @@ def get_args():
     parser.add_argument("--save_total_limit", type=int, default=10)
     parser.add_argument("--local-rank", type=int, default=0)
     parser.add_argument("--no_custom_tokenizer", action="store_true")
+
+    parser.add_argument("--fim_rate", type=float, default=1)
+    parser.add_argument("--fim_spm_rate", type=float, default=0.5)
 
     parser.add_argument("--humaneval_eval_loss", action="store_true")
     parser.add_argument("--eval_reruns", type=int, default=1)
@@ -192,6 +196,8 @@ class ConstantLengthDataset(IterableDataset):
         chars_per_token=3.6,
         content_field="content",
         reruns=1,
+        fim_rate=1,
+        fim_spm_rate=0.5,
     ):
         self.tokenizer = tokenizer
         self.concat_token_id = tokenizer.eos_token_id if tokenizer.eos_token_id is not None else args.eos_token_id
@@ -202,6 +208,21 @@ class ConstantLengthDataset(IterableDataset):
         self.max_buffer_size = seq_length * chars_per_token * num_of_sequences
         self.content_field = content_field
         self.reruns = reruns
+        self.fim_rate = fim_rate
+        self.fim_spm_rate = fim_spm_rate
+        self.seed = 0
+
+        (
+            self.suffix_tok_id,
+            self.prefix_tok_id,
+            self.middle_tok_id,
+            self.pad_tok_id,
+        ) = fim.get_fim_token_ids(self.tokenizer)
+        print(
+            f"Using fim tokens: {self.suffix_tok_id}, {self.prefix_tok_id}, {self.middle_tok_id}, {self.pad_tok_id}"
+        )
+        if not self.suffix_tok_id and self.fim_rate > 0:
+            raise ValueError("FIM not supported for this tokenizer")
 
     def __iter__(self):
         iterator = iter(self.dataset)
@@ -226,8 +247,22 @@ class ConstantLengthDataset(IterableDataset):
                 buffer, truncation=False)["input_ids"]
             all_token_ids = []
             examples = []
+            np_rng = np.random.RandomState(seed=self.seed)
             for tokenized_input in tokenized_inputs:
-                all_token_ids.extend(tokenized_input + [self.concat_token_id])
+                # optionally do FIM permutations
+                if self.fim_rate > 0:
+                    tokenized_input, np_rng = fim.permute(
+                        self.tokenizer,
+                        tokenized_input,
+                        np_rng,
+                        self.suffix_tok_id,
+                        self.prefix_tok_id,
+                        self.middle_tok_id,
+                        fim_rate=self.fim_rate,
+                        fim_spm_rate=self.fim_spm_rate,
+                    )
+                if not tokenized_input is None:
+                    all_token_ids.extend(tokenized_input + [self.concat_token_id])
             for i in range(0, len(all_token_ids), self.seq_length):
                 input_ids = all_token_ids[i: i + self.seq_length]
                 if len(input_ids) == self.seq_length:
@@ -320,6 +355,8 @@ def create_datasets(tokenizer, args):
         seq_length=args.seq_length,
         chars_per_token=chars_per_token,
         content_field=args.data_column,
+        fim_rate=args.fim_rate,
+        fim_spm_rate=args.fim_spm_rate,
     )
     valid_dataset = ConstantLengthDataset(
         tokenizer,
@@ -329,6 +366,8 @@ def create_datasets(tokenizer, args):
         chars_per_token=chars_per_token,
         content_field=args.data_column,
         reruns=args.eval_reruns,
+        fim_rate=args.fim_rate,
+        fim_spm_rate=args.fim_spm_rate,
     )
 
     return max_steps, train_dataset, valid_dataset

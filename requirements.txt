@@ -7,3 +7,4 @@ peft
 accelerate
 bitsandbytes
 deepspeed
+tree_sitter==0.20.1
