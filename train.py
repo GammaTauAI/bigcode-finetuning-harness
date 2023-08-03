@@ -267,6 +267,7 @@ class ConstantLengthDataset(IterableDataset):
             )
 
             tokenized_inputs = []
+            print("Starting to process tokenized inputs for this batch")
             while True:
                 try:
                     def timeout_handler(_, __):
@@ -284,6 +285,7 @@ class ConstantLengthDataset(IterableDataset):
                     break
                 except StopIteration:
                     break
+            print("Finished processing tokenized inputs")
 
             signal.alarm(0)
 
