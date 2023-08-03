@@ -27,6 +27,7 @@ from transformers import (
 )
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 import fim
+import numpy as np
 
 
 class SavePeftModelCallback(TrainerCallback):
