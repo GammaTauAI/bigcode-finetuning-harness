@@ -34,31 +34,6 @@ def get_fim_token_ids(tokenizer):
         suffix_tok_id, prefix_tok_id, middle_tok_id, pad_tok_id = None, None, None, None
     return suffix_tok_id, prefix_tok_id, middle_tok_id, pad_tok_id
 
-
-def permute_pool_program(tpl):
-    tokenizer = tpl[0]
-    tokenized_input = tpl[1]
-    np_rng = tpl[2]
-    suffix_tok_id = tpl[3]
-    prefix_tok_id = tpl[4]
-    middle_tok_id = tpl[5]
-    fim_rate = tpl[6]
-    fim_spm_rate = tpl[7]
-    if fim_rate == 0:
-        return tokenized_input
-    toks, _ = permute(
-        tokenizer,
-        tokenized_input,
-        np_rng,
-        suffix_tok_id,
-        prefix_tok_id,
-        middle_tok_id,
-        fim_rate=fim_rate,
-        fim_spm_rate=fim_spm_rate,
-    )
-    return toks
-
-
 def get_prefix_middle_suffix(np_rng: RandomState, sample: bytes, strip_suffix_rate: float) -> Optional[Tuple[Tuple[str, str, str], RandomState]]:
     def is_child_type_annotation(node):
         """Checks if any of the parent nodes is an annotation node."""
